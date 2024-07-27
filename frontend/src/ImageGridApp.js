@@ -83,7 +83,7 @@ const ImageGridApp = () => {
     }}>
       <Card style={{
         width: '100%',
-        maxWidth: '400px',
+        maxWidth: '600px',
         background: 'rgba(255, 255, 255, 0.3)',
         backdropFilter: 'blur(10px)',
         border: 'none',
@@ -96,7 +96,7 @@ const ImageGridApp = () => {
           
           <div style={{ marginBottom: '1rem' }}>
             <Typography style={{ color: 'white', display: 'flex', alignItems: 'center' }}>
-              <Camera style={{ marginRight: '0.5rem' }} /> Image Size: {individualImageSize}px
+              <Camera style={{ marginRight: '0.5rem' }} /> Individual Image Size: {individualImageSize}pixels by {individualImageSize}pixels
             </Typography>
             <Slider
               value={individualImageSize}
@@ -130,7 +130,7 @@ const ImageGridApp = () => {
             }
             label={
               <Typography style={{ color: 'white', display: 'flex', alignItems: 'center' }}>
-                <Printer style={{ marginRight: '0.5rem' }} /> Printer Paper Format
+                <Printer style={{ marginRight: '0.5rem' }} /> Printer Paper Shape
               </Typography>
             }
           />
