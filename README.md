@@ -2,6 +2,8 @@
 
 This application allows users to create image grids from multiple images. It consists of a React frontend and a Flask backend.
 
+![Image 1](./assets/ui_preview.png)
+
 ## Prerequisites
 
 - Python 3.7+
