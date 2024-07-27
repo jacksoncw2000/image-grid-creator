@@ -1,3 +1,84 @@
+# uploads folder
+uploads/
+
+# outputs folder
+outputs/
+
+# .vscode Folder
+.vscode/
+
+# JetBrains IDEs project-specific settings and metadata
+.idea
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environment
+venv/
+env/
+ENV/
+
+# Flask
+instance/
+.webassets-cache
+
+# React / Node.js
+node_modules/
+/build
+.DS_Store
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# IDEs and Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Project specific
+uploads/
+outputs/
+*.log
+*.sqlite
+
+# Environment variables
+.env
+
 # Created by https://www.toptal.com/developers/gitignore/api/python,pycharm,visualstudio,macos,windows
 # Edit at https://www.toptal.com/developers/gitignore?templates=python,pycharm,visualstudio,macos,windows
 
