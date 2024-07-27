@@ -102,8 +102,8 @@ const ImageGridApp = () => {
               value={individualImageSize}
               onChange={(_, newValue) => setIndividualImageSize(newValue)}
               min={100}
-              max={2000}
-              step={100}
+              max={3000}
+              step={50}
             />
           </div>
           
