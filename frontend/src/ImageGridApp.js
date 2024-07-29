@@ -46,7 +46,7 @@ const ImageGridApp = () => {
     formData.append('printerPaperFormat', printerPaperFormat);
   
     try {
-      const response = await axios.post('http://127.0.0.1:5000/api/generate-grid', formData, {
+      const response = await axios.post('http://127.0.0.1:5000/api/create-grid', formData, {
         responseType: 'blob',
         timeout: 360000, // 360 seconds
         onUploadProgress: (progressEvent) => {
@@ -186,7 +186,7 @@ const ImageGridApp = () => {
             disabled={loading || fileCount === 0}
             style={{ marginTop: '1rem', background: 'white', color: '#9c27b0' }}
           >
-            {loading ? 'Generating...' : 'Generate Image Grid'}
+            {loading ? 'Creating...' : 'Create Image Grid'}
           </Button>
 
           {loading && (

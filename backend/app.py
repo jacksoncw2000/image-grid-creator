@@ -32,9 +32,9 @@ def test_route():
 def home():
     return "Welcome to the Image Grid API"
 
-@app.route('/api/generate-grid', methods=['POST'])
-def generate_grid():
-    app.logger.debug("Received request for generate_grid")
+@app.route('/api/create-grid', methods=['POST'])
+def create_grid():
+    app.logger.debug("Received request for create_grid")
     try:
         if 'files[]' not in request.files:
             app.logger.error("No files part in the request")
@@ -62,7 +62,7 @@ def generate_grid():
         printer_paper_format = str_to_bool(request.form.get('printerPaperFormat', 'false'))
         app.logger.debug(f"Parameters: size={individual_image_size}, randomized={randomized_order}, printer_format={printer_paper_format}")
         
-        # Generate the image grid
+        # Create the image grid
         outputs_directory = 'outputs'
         ensure_directory_exists(outputs_directory)
         base_directory_name = os.path.basename(batch_folder)
@@ -71,14 +71,14 @@ def generate_grid():
                                            individual_image_size=individual_image_size, 
                                            randomized_order=randomized_order, 
                                            printer_paper_format=printer_paper_format)
-        app.logger.debug(f"Grid generated: {grid_file_path}")
+        app.logger.debug(f"Grid created: {grid_file_path}")
         
         if grid_file_path is None or not os.path.exists(grid_file_path):
-            raise FileNotFoundError("Grid file not generated or not found")
+            raise FileNotFoundError("Grid file not created or not found")
         
         return send_file(grid_file_path, as_attachment=True, download_name='grid.png', mimetype='image/png')
     except Exception as e:
-        app.logger.error(f"Error in generate_grid: {str(e)}")
+        app.logger.error(f"Error in create_grid: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
