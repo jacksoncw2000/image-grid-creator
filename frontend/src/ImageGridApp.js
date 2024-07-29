@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Card, CardContent, Typography, Button, Switch, Slider, FormControlLabel, LinearProgress } from '@mui/material';
 import { Camera, Shuffle, Printer, FolderOpen } from 'lucide-react';
 import axios from 'axios';
@@ -10,13 +10,26 @@ const ImageGridApp = () => {
   const [selectedFiles, setSelectedFiles] = useState(null);
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [fileCount, setFileCount] = useState(0);
+  const fileInputRef = useRef(null);
 
   const handleFileSelect = (event) => {
     setSelectedFiles(event.target.files);
+    setFileCount(event.target.files.length);
+  };
+
+  const resetState = () => {
+    setLoading(false);
+    setProgress(0);
+    setFileCount(0);
+    setSelectedFiles(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
   };
 
   const handleSubmit = async () => {
-    if (!selectedFiles) {
+    if (!selectedFiles || selectedFiles.length === 0) {
       alert('Please select files first');
       return;
     }
@@ -50,6 +63,10 @@ const ImageGridApp = () => {
         link.setAttribute('download', 'grid.png');
         document.body.appendChild(link);
         link.click();
+        document.body.removeChild(link);
+        
+        // Reset state after download is complete
+        resetState();
       } else {
         throw new Error(`Unexpected response status: ${response.status}`);
       }
@@ -142,6 +159,7 @@ const ImageGridApp = () => {
               onChange={handleFileSelect}
               style={{ display: 'none' }}
               id="file-select"
+              ref={fileInputRef}
             />
             <label htmlFor="file-select">
               <Button
@@ -154,9 +172,9 @@ const ImageGridApp = () => {
                 Choose Files
               </Button>
             </label>
-            {selectedFiles && (
+            {fileCount > 0 && (
               <Typography style={{ color: 'white', marginTop: '0.5rem' }}>
-                {selectedFiles.length} files selected
+                {fileCount} files selected
               </Typography>
             )}
           </div>
@@ -165,7 +183,7 @@ const ImageGridApp = () => {
             variant="contained"
             fullWidth
             onClick={handleSubmit}
-            disabled={loading}
+            disabled={loading || fileCount === 0}
             style={{ marginTop: '1rem', background: 'white', color: '#9c27b0' }}
           >
             {loading ? 'Generating...' : 'Generate Image Grid'}
@@ -175,7 +193,7 @@ const ImageGridApp = () => {
             <div style={{ marginTop: '1rem' }}>
               <LinearProgress variant="determinate" value={progress} />
               <Typography style={{ color: 'white', textAlign: 'center', marginTop: '0.5rem' }}>
-                {progress}% Complete
+                Uploading Images {progress}% Complete
               </Typography>
             </div>
           )}
