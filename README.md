@@ -2,7 +2,11 @@
 
 This application allows users to create image grids from multiple images. It consists of a React frontend and a Flask backend.
 
+User Interace
 ![Image 1](./assets/ui_preview.png)
+
+Example Output
+![Image 2](./assets/output_preview.png)
 
 ## Prerequisites
 
