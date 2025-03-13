@@ -76,7 +76,7 @@ def create_grid():
         if grid_file_path is None or not os.path.exists(grid_file_path):
             raise FileNotFoundError("Grid file not created or not found")
         
-        return send_file(grid_file_path, as_attachment=True, download_name='grid.png', mimetype='image/png')
+        return send_file(grid_file_path, mimetype='image/png')
     except Exception as e:
         app.logger.error(f"Error in create_grid: {str(e)}")
         return jsonify({'error': str(e)}), 500

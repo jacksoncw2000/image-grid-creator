@@ -9,7 +9,7 @@ from PIL import Image, ExifTags
 def grid_images(input_folder, base_directory_name, outputs_directory, individual_image_size=1000, randomized_order=True, printer_paper_format=False):
 
     current_date_time = datetime.datetime.now()
-    current_date_time = current_date_time.strftime('%Y%m%d_%H%M%S')
+    current_date_time = current_date_time.strftime('%Y.%m.%d_%H.%M.%S')
 
     print(f'\n[INFO] Attempting to grid images.\n')
 
@@ -65,7 +65,7 @@ def grid_images(input_folder, base_directory_name, outputs_directory, individual
 
         grid.paste(image, (x, y))
 
-    file_output_path = os.path.join(outputs_directory, f"{current_date_time}_{base_directory_name}.png")
+    file_output_path = os.path.join(outputs_directory, f"{current_date_time}_image_grid.png")
     grid.save(file_output_path)
 
     print("\n[INFO] Image grid complete.\n")

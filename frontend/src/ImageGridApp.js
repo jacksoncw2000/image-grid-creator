@@ -57,10 +57,22 @@ const ImageGridApp = () => {
   
       if (response.status === 200) {
         setProgress(100);
+        
+        // Create a timestamp-formatted filename
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        const seconds = String(now.getSeconds()).padStart(2, '0');
+        const formattedDate = `${year}.${month}.${day}_${hours}.${minutes}.${seconds}`;
+        const filename = `${formattedDate}_image_grid.png`;
+        
         const url = window.URL.createObjectURL(new Blob([response.data]));
         const link = document.createElement('a');
         link.href = url;
-        link.setAttribute('download', 'grid.png');
+        link.setAttribute('download', filename);
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
