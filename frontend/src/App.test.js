@@ -1,8 +1,13 @@
 import { render, screen } from '@testing-library/react';
 import App from './App';
 
-test('renders learn react link', () => {
+jest.mock('axios', () => ({
+  post: jest.fn(),
+}));
+
+test('renders the image grid tool', () => {
   render(<App />);
-  const linkElement = screen.getByText(/learn react/i);
-  expect(linkElement).toBeInTheDocument();
+
+  expect(screen.getByRole('heading', { name: /image grid creator/i })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: /create grid/i })).toBeDisabled();
 });

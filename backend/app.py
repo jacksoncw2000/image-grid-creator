@@ -1,85 +1,189 @@
-from flask import Flask, request, jsonify, send_file
-from flask_cors import CORS
-from werkzeug.utils import secure_filename
-import os
 import logging
-from datetime import datetime
-from grid_images import grid_images
-from utility.utils_general import str_to_bool, ensure_directory_exists
+import os
+from pathlib import Path
 
+from flask import Flask, Response, jsonify, request
 from flask_cors import CORS
+from werkzeug.exceptions import RequestEntityTooLarge
+from werkzeug.utils import secure_filename
 
-app = Flask(__name__)
-CORS(app, resources={r"/api/*": {"origins": "*"}})
+from image_grid import (
+    DEFAULT_MAX_OUTPUT_PIXELS,
+    SUPPORTED_EXTENSIONS,
+    GridOptions,
+    ImageGridError,
+    ImageInput,
+    generate_image_grid,
+    is_supported_filename,
+)
+from utility.utils_general import str_to_bool
 
-app.logger.setLevel(logging.DEBUG)
 
-UPLOAD_FOLDER = 'uploads'
-ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
+BASE_DIR = Path(__file__).resolve().parent
+DEFAULT_MAX_UPLOAD_MB = 2048
 
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-ensure_directory_exists(UPLOAD_FOLDER)
-app.config['MAX_CONTENT_LENGTH'] = 256 * 1024 * 1024  # for example, limit to 256MB
 
-def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+def create_app(config=None):
+    app = Flask(__name__)
+    app.config.from_mapping(
+        MAX_CONTENT_LENGTH=_max_upload_bytes(),
+        MAX_OUTPUT_PIXELS=_env_int("MAX_OUTPUT_PIXELS", DEFAULT_MAX_OUTPUT_PIXELS),
+        OUTPUT_FOLDER=Path(os.getenv("OUTPUT_FOLDER", BASE_DIR / "outputs")),
+    )
 
-@app.route('/api/test', methods=['GET'])
-def test_route():
-    return jsonify({"message": "Test successful"}), 200
+    if config:
+        app.config.update(config)
 
-@app.route('/')
-def home():
-    return "Welcome to the Image Grid API"
+    CORS(app, resources={r"/api/*": {"origins": "*"}})
+    app.logger.setLevel(logging.INFO)
 
-@app.route('/api/create-grid', methods=['POST'])
-def create_grid():
-    app.logger.debug("Received request for create_grid")
+    @app.errorhandler(RequestEntityTooLarge)
+    def handle_request_entity_too_large(error):
+        limit_mb = app.config["MAX_CONTENT_LENGTH"] / (1024 * 1024)
+        return _json_error(
+            f"Upload is too large. The current limit is {limit_mb:.0f} MB.",
+            413,
+            "upload_too_large",
+        )
+
+    @app.route("/")
+    def home():
+        return jsonify(
+            {
+                "message": "Image Grid API",
+                "maxUploadMb": round(app.config["MAX_CONTENT_LENGTH"] / (1024 * 1024)),
+                "supportedExtensions": sorted(SUPPORTED_EXTENSIONS),
+            }
+        )
+
+    @app.route("/api/test", methods=["GET"])
+    def test_route():
+        return jsonify({"message": "Test successful"}), 200
+
+    @app.route("/api/create-grid", methods=["POST"])
+    def create_grid():
+        try:
+            image_inputs = _image_inputs_from_request()
+            options = GridOptions(
+                individual_image_size=_form_int("individualImageSize", 1000),
+                randomized_order=str_to_bool(request.form.get("randomizedOrder", "true")),
+                printer_paper_format=str_to_bool(request.form.get("printerPaperFormat", "false")),
+                max_output_pixels=app.config["MAX_OUTPUT_PIXELS"],
+            )
+
+            generated_grid = generate_image_grid(
+                image_inputs=image_inputs,
+                output_directory=app.config["OUTPUT_FOLDER"],
+                options=options,
+            )
+
+            return _grid_file_response(generated_grid, app)
+        except RequestEntityTooLarge:
+            raise
+        except ImageGridError as error:
+            return _json_error(str(error), 400, "invalid_grid_request")
+        except ValueError as error:
+            return _json_error(str(error), 400, "invalid_form_value")
+        except Exception:
+            app.logger.exception("Unexpected error while creating image grid")
+            return _json_error(
+                "An unexpected error occurred while creating the grid.",
+                500,
+                "grid_generation_failed",
+            )
+
+    return app
+
+
+def _image_inputs_from_request():
+    if "files[]" not in request.files:
+        raise ValueError("No files were uploaded.")
+
+    files = [file for file in request.files.getlist("files[]") if file and file.filename]
+    if not files:
+        raise ValueError("No files were selected.")
+
+    unsupported = [file.filename for file in files if not is_supported_filename(file.filename)]
+    if unsupported:
+        preview = ", ".join(unsupported[:5])
+        suffix = "" if len(unsupported) <= 5 else f" and {len(unsupported) - 5} more"
+        supported = ", ".join(sorted(SUPPORTED_EXTENSIONS))
+        raise ValueError(
+            f"Unsupported file type for {preview}{suffix}. Supported extensions: {supported}."
+        )
+
+    return [
+        ImageInput(name=secure_filename(file.filename) or file.filename, stream=file.stream)
+        for file in files
+    ]
+
+
+def _form_int(name, default):
+    raw_value = request.form.get(name, default)
     try:
-        if 'files[]' not in request.files:
-            app.logger.error("No files part in the request")
-            return jsonify({'error': 'No files part'}), 400
-        
-        files = request.files.getlist('files[]')
-        if len(files) == 0:
-            app.logger.error("No selected file")
-            return jsonify({'error': 'No selected file'}), 400
-        
-        # Create a new directory for this batch of uploads
-        batch_folder = os.path.join(app.config['UPLOAD_FOLDER'], secure_filename(str(datetime.now())))
-        os.makedirs(batch_folder)
-        app.logger.debug(f"Created batch folder: {batch_folder}")
-        
-        for file in files:
-            if file and allowed_file(file.filename):
-                filename = secure_filename(file.filename)
-                file.save(os.path.join(batch_folder, filename))
-        app.logger.debug(f"Saved {len(files)} files")
-        
-        # Get parameters from the request
-        individual_image_size = int(request.form.get('individualImageSize', 1000))
-        randomized_order = str_to_bool(request.form.get('randomizedOrder', 'true'))
-        printer_paper_format = str_to_bool(request.form.get('printerPaperFormat', 'false'))
-        app.logger.debug(f"Parameters: size={individual_image_size}, randomized={randomized_order}, printer_format={printer_paper_format}")
-        
-        # Create the image grid
-        outputs_directory = 'outputs'
-        ensure_directory_exists(outputs_directory)
-        base_directory_name = os.path.basename(batch_folder)
-        
-        grid_file_path = grid_images(batch_folder, base_directory_name, outputs_directory, 
-                                           individual_image_size=individual_image_size, 
-                                           randomized_order=randomized_order, 
-                                           printer_paper_format=printer_paper_format)
-        app.logger.debug(f"Grid created: {grid_file_path}")
-        
-        if grid_file_path is None or not os.path.exists(grid_file_path):
-            raise FileNotFoundError("Grid file not created or not found")
-        
-        return send_file(grid_file_path, mimetype='image/png')
-    except Exception as e:
-        app.logger.error(f"Error in create_grid: {str(e)}")
-        return jsonify({'error': str(e)}), 500
+        return int(raw_value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{name} must be a number.") from exc
 
-if __name__ == '__main__':
+
+def _json_error(message, status_code, code):
+    return jsonify({"error": {"code": code, "message": message}}), status_code
+
+
+def _grid_file_response(generated_grid, app):
+    output_path = Path(generated_grid.path)
+    headers = {
+        "Content-Disposition": f"attachment; filename={generated_grid.download_name}",
+        "Content-Length": str(output_path.stat().st_size),
+        "Cache-Control": "no-cache",
+    }
+
+    return Response(
+        _stream_file_then_cleanup(output_path, app),
+        mimetype="image/png",
+        headers=headers,
+        direct_passthrough=True,
+    )
+
+
+def _stream_file_then_cleanup(path, app, chunk_size=1024 * 1024):
+    try:
+        with Path(path).open("rb") as file:
+            while True:
+                chunk = file.read(chunk_size)
+                if not chunk:
+                    break
+                yield chunk
+    finally:
+        _cleanup_file(path, app)
+
+
+def _cleanup_file(path, app):
+    try:
+        Path(path).unlink()
+    except FileNotFoundError:
+        return
+    except OSError:
+        app.logger.warning("Could not remove temporary grid output %s", path)
+
+
+def _max_upload_bytes():
+    return _env_int("MAX_UPLOAD_MB", DEFAULT_MAX_UPLOAD_MB) * 1024 * 1024
+
+
+def _env_int(name, default):
+    raw_value = os.getenv(name)
+    if raw_value is None:
+        return default
+
+    try:
+        return int(raw_value)
+    except ValueError:
+        return default
+
+
+app = create_app()
+
+
+if __name__ == "__main__":
     app.run(debug=True)

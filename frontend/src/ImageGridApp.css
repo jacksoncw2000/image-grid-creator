@@ -1,0 +1,132 @@
+.grid-app-shell {
+  min-height: 100vh;
+  background:
+    linear-gradient(135deg, #f6f7f1 0%, #e8efee 48%, #f4ece3 100%);
+  display: flex;
+  align-items: center;
+  padding: 32px 0;
+}
+
+.grid-app-container {
+  width: 100%;
+}
+
+.grid-tool-panel {
+  border: 1px solid rgba(28, 39, 43, 0.14);
+  border-radius: 8px !important;
+  background: rgba(255, 255, 255, 0.92) !important;
+  box-shadow: 0 24px 70px rgba(36, 45, 48, 0.13) !important;
+  padding: clamp(22px, 5vw, 42px);
+}
+
+.grid-tool-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.grid-tool-title {
+  color: #1f2a2e;
+  font-size: clamp(2rem, 5vw, 3.1rem) !important;
+  font-weight: 760 !important;
+  letter-spacing: 0 !important;
+  line-height: 1.05 !important;
+}
+
+.grid-count-chip {
+  background: #eef6f3 !important;
+  border: 1px solid #c8ddd6 !important;
+  color: #22544c !important;
+  font-weight: 700 !important;
+  flex-shrink: 0;
+}
+
+.setting-row {
+  margin-bottom: 2px;
+}
+
+.setting-label {
+  color: #26363a;
+  font-weight: 700 !important;
+}
+
+.setting-value,
+.file-summary,
+.progress-label {
+  color: #607074;
+}
+
+.switch-control {
+  border: 1px solid #d8e0df;
+  border-radius: 8px;
+  margin: 0 !important;
+  padding: 10px 14px;
+  flex: 1;
+}
+
+.hidden-file-input {
+  display: none;
+}
+
+.choose-file-label {
+  display: block;
+  flex: 1;
+}
+
+.create-button {
+  background: #22544c !important;
+  border-radius: 8px !important;
+  box-shadow: none !important;
+  color: #ffffff !important;
+  min-height: 48px;
+}
+
+.create-button:hover {
+  background: #183e38 !important;
+}
+
+.grid-tool-panel .MuiButton-root {
+  border-radius: 8px;
+  font-weight: 740;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.grid-tool-panel .MuiSlider-root,
+.grid-tool-panel .MuiSwitch-switchBase.Mui-checked,
+.grid-tool-panel .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track {
+  color: #22544c;
+}
+
+.grid-tool-panel .MuiLinearProgress-root {
+  border-radius: 999px;
+  height: 8px;
+  background-color: #dce6e3;
+}
+
+.grid-tool-panel .MuiLinearProgress-bar {
+  background-color: #22544c;
+}
+
+.progress-label {
+  margin-top: 10px !important;
+  text-align: center;
+  font-weight: 650 !important;
+}
+
+@media (max-width: 640px) {
+  .grid-app-shell {
+    align-items: flex-start;
+    padding: 16px 0;
+  }
+
+  .grid-tool-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .grid-count-chip {
+    max-width: 100%;
+  }
+}

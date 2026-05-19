@@ -1,90 +1,88 @@
 # Image Grid Creator
 
-This application allows users to create image grids from multiple images. It consists of a React frontend and a Flask backend.
+Create a downloadable PNG grid from a batch of images. The app has a Flask backend
+for image processing and a React frontend for upload/settings/download.
 
-User Interace
-![Image 1](./assets/ui_preview.png)
+![UI Preview](./assets/ui_preview.png)
 
-Example Output
-![Image 2](./assets/output_preview.png)
+![Example Output](./assets/output_preview.png)
 
-## Prerequisites
+## What Changed
 
-- Python 3.7+
-- Node.js 12+
-- npm 6+
+- Large uploads now return a clear `413` instead of being swallowed as a generic
+  `500`.
+- The default backend upload limit is now 2 GB. Override it with `MAX_UPLOAD_MB`.
+- Grid generation computes real rows and columns, including printer-paper-shaped
+  layouts, instead of relying on repeated square-root rounding.
+- Images are processed one at a time, EXIF orientation is handled with Pillow, and
+  uploads are no longer copied into permanent batch folders.
+- HEIC/HEIF uploads are decoded in memory with `pillow-heif`; source files are
+  only read, never modified.
+- The frontend now shows inline errors and separates upload progress from the
+  backend generation phase.
 
-## Setup
+## Requirements
 
-Clone the repository and navigate to the project directory:
+- Python 3.8+
+- Node.js 16+
+- npm
+
+## Backend
 
 ```bash
-git clone <repository-url>
-cd image-grid-creator
+cd backend
+python -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+python app.py
 ```
 
-### Backend Setup
+The API runs at `http://127.0.0.1:5000`.
 
-1. Navigate to the backend directory:
-   ```bash
-   cd backend
-   ```
+Optional environment variables:
 
-2. Create a virtual environment:
-   ```bash
-   python -m venv venv
-   ```
+```bash
+MAX_UPLOAD_MB=2048
+MAX_OUTPUT_PIXELS=300000000
+OUTPUT_FOLDER=/path/to/outputs
+```
 
-3. Activate the virtual environment:
-   - On Windows:
-     ```
-     venv\Scripts\activate
-     ```
-   - On macOS and Linux:
-     ```
-     source venv/bin/activate
-     ```
+## Frontend
 
-4. Install the required Python packages:
-   ```bash
-   pip install -r requirements.txt
-   ```
+```bash
+cd frontend
+npm install
+npm start
+```
 
-5. Start the Flask server:
-   ```bash
-   python app.py
-   ```
+The React app runs at `http://localhost:3000`.
 
-The backend should now be running on `http://localhost:5000`.
+To point the frontend at a different backend:
 
-### Frontend Setup
+```bash
+REACT_APP_API_BASE_URL=http://127.0.0.1:5000 npm start
+```
 
-1. Open a new terminal window and navigate to the frontend directory:
-   ```bash
-   cd frontend
-   ```
+## Tests
 
-2. Install the required npm packages:
-   ```bash
-   npm install
-   ```
+```bash
+cd backend
+./venv/bin/python -m unittest discover -s tests
+```
 
-3. Start the React development server:
-   ```bash
-   npm start
-   ```
-
-The frontend should now be running on `http://localhost:3000`.
-
-## Usage
-
-1. Open your web browser and go to `http://localhost:3000`.
-2. Use the interface to select images, adjust settings, and generate your image grid grid.
-3. The generated image grid will be downloaded automatically.
+```bash
+cd frontend
+npm test -- --watchAll=false
+npm run build
+```
 
 ## Troubleshooting
 
-- If you encounter CORS issues, ensure that the backend is running and that the CORS configuration in `app.py` is correct.
-- If you have trouble uploading images, check that the `UPLOAD_FOLDER` in `app.py` exists and has the correct permissions.
-
-For any other issues, please check the console logs in your browser and the terminal running the Flask server for error messages.
+- `413 Upload is too large`: lower the batch size, compress images, or raise
+  `MAX_UPLOAD_MB`.
+- `Requested grid is too large`: lower the cell size or split the batch. This
+  protects the backend from creating a huge in-memory PNG.
+- HEIC files fail to open: reinstall backend requirements with
+  `pip install -r requirements.txt` and restart Flask.
+- `No response from the backend`: make sure Flask is running on port `5000`, or
+  set `REACT_APP_API_BASE_URL` to the backend URL you are using.

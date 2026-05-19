@@ -1,217 +1,297 @@
-import React, { useState, useRef } from 'react';
-import { Card, CardContent, Typography, Button, Switch, Slider, FormControlLabel, LinearProgress } from '@mui/material';
-import { Camera, Shuffle, Printer, FolderOpen } from 'lucide-react';
-import axios from 'axios';
+import React, { useMemo, useRef, useState } from 'react';
+import {
+  Alert,
+  Box,
+  Button,
+  Chip,
+  Container,
+  Divider,
+  FormControlLabel,
+  LinearProgress,
+  Paper,
+  Slider,
+  Stack,
+  Switch,
+  Tooltip,
+  Typography,
+} from '@mui/material';
+import {
+  Camera,
+  CheckCircle2,
+  Download,
+  FolderOpen,
+  Image as ImageIcon,
+  Printer,
+  RotateCcw,
+  Shuffle,
+} from 'lucide-react';
+import { createImageGrid, readApiErrorMessage } from './api';
+import {
+  ACCEPTED_IMAGE_EXTENSIONS,
+  DEFAULT_BACKEND_UPLOAD_LIMIT_BYTES,
+  downloadBlob,
+  filenameFromHeaders,
+  fileStats,
+  filesFromInput,
+  formatBytes,
+} from './fileUtils';
+import './ImageGridApp.css';
+
+const DEFAULT_SETTINGS = {
+  individualImageSize: 1000,
+  randomizedOrder: true,
+  printerPaperFormat: false,
+};
 
 const ImageGridApp = () => {
-  const [individualImageSize, setIndividualImageSize] = useState(1000);
-  const [randomizedOrder, setRandomizedOrder] = useState(true);
-  const [printerPaperFormat, setPrinterPaperFormat] = useState(false);
-  const [selectedFiles, setSelectedFiles] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [fileCount, setFileCount] = useState(0);
+  const [settings, setSettings] = useState(DEFAULT_SETTINGS);
+  const [selectedFiles, setSelectedFiles] = useState([]);
+  const [phase, setPhase] = useState('idle');
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
   const fileInputRef = useRef(null);
 
-  const handleFileSelect = (event) => {
-    setSelectedFiles(event.target.files);
-    setFileCount(event.target.files.length);
+  const selectedStats = useMemo(() => fileStats(selectedFiles), [selectedFiles]);
+  const isWorking = phase !== 'idle';
+  const isOverDefaultUploadLimit =
+    selectedStats.totalBytes > DEFAULT_BACKEND_UPLOAD_LIMIT_BYTES;
+
+  const updateSetting = (key, value) => {
+    setSettings((current) => ({ ...current, [key]: value }));
   };
 
-  const resetState = () => {
-    setLoading(false);
-    setProgress(0);
-    setFileCount(0);
-    setSelectedFiles(null);
+  const handleFileSelect = (event) => {
+    setSelectedFiles(filesFromInput(event.target.files));
+    setErrorMessage('');
+    setSuccessMessage('');
+    setUploadProgress(0);
+  };
+
+  const clearSelection = () => {
+    setSelectedFiles([]);
+    setErrorMessage('');
+    setSuccessMessage('');
+    setUploadProgress(0);
+
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
   };
 
   const handleSubmit = async () => {
-    if (!selectedFiles || selectedFiles.length === 0) {
-      alert('Please select files first');
+    if (!selectedFiles.length) {
+      setErrorMessage('Select at least one image.');
       return;
     }
-  
-    setLoading(true);
-    setProgress(0);
-  
-    const formData = new FormData();
-    for (let i = 0; i < selectedFiles.length; i++) {
-      formData.append('files[]', selectedFiles[i]);
-    }
-    formData.append('individualImageSize', individualImageSize);
-    formData.append('randomizedOrder', randomizedOrder);
-    formData.append('printerPaperFormat', printerPaperFormat);
-  
+
+    setPhase('uploading');
+    setUploadProgress(0);
+    setErrorMessage('');
+    setSuccessMessage('');
+
     try {
-      const response = await axios.post('http://127.0.0.1:5000/api/create-grid', formData, {
-        responseType: 'blob',
-        timeout: 360000, // 360 seconds
+      const response = await createImageGrid({
+        files: selectedFiles,
+        settings,
         onUploadProgress: (progressEvent) => {
-          const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-          setProgress(percentCompleted);
-        }
+          if (!progressEvent.total) {
+            return;
+          }
+
+          const percent = Math.min(
+            100,
+            Math.round((progressEvent.loaded * 100) / progressEvent.total)
+          );
+          setUploadProgress(percent);
+
+          if (percent >= 100) {
+            setPhase('generating');
+          }
+        },
       });
-  
-      if (response.status === 200) {
-        setProgress(100);
-        
-        // Create a timestamp-formatted filename
-        const now = new Date();
-        const year = now.getFullYear();
-        const month = String(now.getMonth() + 1).padStart(2, '0');
-        const day = String(now.getDate()).padStart(2, '0');
-        const hours = String(now.getHours()).padStart(2, '0');
-        const minutes = String(now.getMinutes()).padStart(2, '0');
-        const seconds = String(now.getSeconds()).padStart(2, '0');
-        const formattedDate = `${year}.${month}.${day}_${hours}.${minutes}.${seconds}`;
-        const filename = `${formattedDate}_image_grid.png`;
-        
-        const url = window.URL.createObjectURL(new Blob([response.data]));
-        const link = document.createElement('a');
-        link.href = url;
-        link.setAttribute('download', filename);
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        
-        // Reset state after download is complete
-        resetState();
-      } else {
-        throw new Error(`Unexpected response status: ${response.status}`);
-      }
+
+      const filename = filenameFromHeaders(response.headers);
+      downloadBlob(response.data, filename);
+      setSuccessMessage(`Downloaded ${filename}.`);
+      setUploadProgress(100);
     } catch (error) {
-      console.error('Error generating grid:', error);
-      if (error.response) {
-        console.error('Response data:', error.response.data);
-        console.error('Response status:', error.response.status);
-        console.error('Response headers:', error.response.headers);
-        alert(`Error generating grid. Server responded with status ${error.response.status}`);
-      } else if (error.request) {
-        console.error('No response received:', error.request);
-        alert('Error generating grid. No response received from server. Please check if the server is running and accessible.');
-      } else {
-        console.error('Error setting up request:', error.message);
-        alert(`Error generating grid: ${error.message}`);
-      }
+      setErrorMessage(await readApiErrorMessage(error));
     } finally {
-      setLoading(false);
+      setPhase('idle');
     }
   };
 
-  return (
-    <div style={{
-      minHeight: '100vh',
-      background: 'linear-gradient(to bottom right, #9c27b0, #f48fb1, #ff7043)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: '1rem'
-    }}>
-      <Card style={{
-        width: '100%',
-        maxWidth: '600px',
-        background: 'rgba(255, 255, 255, 0.3)',
-        backdropFilter: 'blur(10px)',
-        border: 'none',
-        boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.37)'
-      }}>
-        <CardContent>
-          <Typography variant="h4" component="div" style={{ textAlign: 'center', color: 'white', marginBottom: '1rem' }}>
-            Image Grid Creator
-          </Typography>
-          
-          <div style={{ marginBottom: '1rem' }}>
-            <Typography style={{ color: 'white', display: 'flex', alignItems: 'center' }}>
-              <Camera style={{ marginRight: '0.5rem' }} /> Individual Image Size: {individualImageSize}pixels by {individualImageSize}pixels
-            </Typography>
-            <Slider
-              value={individualImageSize}
-              onChange={(_, newValue) => setIndividualImageSize(newValue)}
-              min={100}
-              max={3000}
-              step={50}
-            />
-          </div>
-          
-          <FormControlLabel
-            control={
-              <Switch
-                checked={randomizedOrder}
-                onChange={(e) => setRandomizedOrder(e.target.checked)}
-              />
-            }
-            label={
-              <Typography style={{ color: 'white', display: 'flex', alignItems: 'center' }}>
-                <Shuffle style={{ marginRight: '0.5rem' }} /> Randomized Order
-              </Typography>
-            }
-          />
-          
-          <FormControlLabel
-            control={
-              <Switch
-                checked={printerPaperFormat}
-                onChange={(e) => setPrinterPaperFormat(e.target.checked)}
-              />
-            }
-            label={
-              <Typography style={{ color: 'white', display: 'flex', alignItems: 'center' }}>
-                <Printer style={{ marginRight: '0.5rem' }} /> Printer Paper Shape
-              </Typography>
-            }
-          />
-          
-          <div style={{ marginTop: '1rem' }}>
-            <input
-              type="file"
-              multiple
-              onChange={handleFileSelect}
-              style={{ display: 'none' }}
-              id="file-select"
-              ref={fileInputRef}
-            />
-            <label htmlFor="file-select">
-              <Button
-                variant="outlined"
-                component="span"
-                fullWidth
-                style={{ color: 'white', borderColor: 'white' }}
-                startIcon={<FolderOpen />}
-              >
-                Choose Files
-              </Button>
-            </label>
-            {fileCount > 0 && (
-              <Typography style={{ color: 'white', marginTop: '0.5rem' }}>
-                {fileCount} files selected
-              </Typography>
-            )}
-          </div>
-          
-          <Button
-            variant="contained"
-            fullWidth
-            onClick={handleSubmit}
-            disabled={loading || fileCount === 0}
-            style={{ marginTop: '1rem', background: 'white', color: '#9c27b0' }}
-          >
-            {loading ? 'Creating...' : 'Create Image Grid'}
-          </Button>
+  const progressLabel =
+    phase === 'generating' ? 'Creating grid...' : `Uploading ${uploadProgress}%`;
 
-          {loading && (
-            <div style={{ marginTop: '1rem' }}>
-              <LinearProgress variant="determinate" value={progress} />
-              <Typography style={{ color: 'white', textAlign: 'center', marginTop: '0.5rem' }}>
-                Uploading Images {progress}% Complete
+  return (
+    <main className="grid-app-shell">
+      <Container maxWidth="md" className="grid-app-container">
+        <Paper elevation={0} className="grid-tool-panel">
+          <Stack spacing={3}>
+            <Box className="grid-tool-header">
+              <Box>
+                <Typography variant="h3" component="h1" className="grid-tool-title">
+                  Image Grid Creator
+                </Typography>
+              </Box>
+              <Chip
+                icon={<ImageIcon size={16} />}
+                label={`${selectedStats.count} selected`}
+                className="grid-count-chip"
+              />
+            </Box>
+
+            <Divider />
+
+            <Box>
+              <Stack
+                direction="row"
+                alignItems="center"
+                justifyContent="space-between"
+                spacing={2}
+                className="setting-row"
+              >
+                <Stack direction="row" spacing={1.25} alignItems="center">
+                  <Camera size={20} />
+                  <Typography className="setting-label">Cell size</Typography>
+                </Stack>
+                <Typography className="setting-value">
+                  {settings.individualImageSize}px
+                </Typography>
+              </Stack>
+              <Slider
+                aria-label="Cell size"
+                value={settings.individualImageSize}
+                onChange={(_, value) => updateSetting('individualImageSize', value)}
+                min={100}
+                max={3000}
+                step={50}
+                valueLabelDisplay="auto"
+              />
+            </Box>
+
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+              <FormControlLabel
+                className="switch-control"
+                control={
+                  <Switch
+                    checked={settings.randomizedOrder}
+                    onChange={(event) =>
+                      updateSetting('randomizedOrder', event.target.checked)
+                    }
+                  />
+                }
+                label={
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <Shuffle size={19} />
+                    <span>Randomized order</span>
+                  </Stack>
+                }
+              />
+
+              <FormControlLabel
+                className="switch-control"
+                control={
+                  <Switch
+                    checked={settings.printerPaperFormat}
+                    onChange={(event) =>
+                      updateSetting('printerPaperFormat', event.target.checked)
+                    }
+                  />
+                }
+                label={
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <Printer size={19} />
+                    <span>Printer shape</span>
+                  </Stack>
+                }
+              />
+            </Stack>
+
+            <Stack spacing={1.5}>
+              <input
+                ref={fileInputRef}
+                id="file-select"
+                type="file"
+                multiple
+                accept={ACCEPTED_IMAGE_EXTENSIONS.join(',')}
+                onChange={handleFileSelect}
+                className="hidden-file-input"
+              />
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
+                <label htmlFor="file-select" className="choose-file-label">
+                  <Button
+                    variant="outlined"
+                    component="span"
+                    startIcon={<FolderOpen size={18} />}
+                    fullWidth
+                  >
+                    Choose files
+                  </Button>
+                </label>
+                <Tooltip title="Clear selected files">
+                  <span>
+                    <Button
+                      variant="text"
+                      color="inherit"
+                      startIcon={<RotateCcw size={17} />}
+                      onClick={clearSelection}
+                      disabled={isWorking || !selectedFiles.length}
+                      fullWidth
+                    >
+                      Clear
+                    </Button>
+                  </span>
+                </Tooltip>
+              </Stack>
+
+              <Typography className="file-summary">
+                {selectedStats.count
+                  ? `${selectedStats.count} files, ${formatBytes(selectedStats.totalBytes)}`
+                  : 'No files selected'}
               </Typography>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    </div>
+            </Stack>
+
+            {isOverDefaultUploadLimit && (
+              <Alert severity="warning">
+                Selected files total {formatBytes(selectedStats.totalBytes)}. The default
+                backend upload limit is {formatBytes(DEFAULT_BACKEND_UPLOAD_LIMIT_BYTES)}.
+              </Alert>
+            )}
+
+            {errorMessage && <Alert severity="error">{errorMessage}</Alert>}
+            {successMessage && (
+              <Alert icon={<CheckCircle2 size={20} />} severity="success">
+                {successMessage}
+              </Alert>
+            )}
+
+            <Button
+              variant="contained"
+              size="large"
+              startIcon={<Download size={19} />}
+              onClick={handleSubmit}
+              disabled={isWorking || !selectedFiles.length}
+              className="create-button"
+            >
+              {isWorking ? 'Working...' : 'Create grid'}
+            </Button>
+
+            {isWorking && (
+              <Box>
+                <LinearProgress
+                  variant={phase === 'generating' ? 'indeterminate' : 'determinate'}
+                  value={uploadProgress}
+                />
+                <Typography className="progress-label">{progressLabel}</Typography>
+              </Box>
+            )}
+          </Stack>
+        </Paper>
+      </Container>
+    </main>
   );
 };
 
