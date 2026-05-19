@@ -48,6 +48,38 @@ class ImageGridTests(unittest.TestCase):
             with Image.open(result.path) as generated:
                 self.assertEqual(generated.size, (150, 100))
 
+    def test_preserves_aspect_ratio_by_default(self):
+        with tempfile.TemporaryDirectory() as directory:
+            result = generate_image_grid(
+                image_inputs=[ImageInput(name="wide.png", stream=_png_stream((20, 80, 160)))],
+                output_directory=directory,
+                options=GridOptions(
+                    individual_image_size=50,
+                    randomized_order=False,
+                ),
+            )
+
+            with Image.open(result.path) as generated:
+                self.assertEqual(generated.getpixel((0, 0)), (255, 255, 255))
+                self.assertEqual(generated.getpixel((25, 25)), (20, 80, 160))
+
+    def test_can_stretch_images_to_square_cells(self):
+        with tempfile.TemporaryDirectory() as directory:
+            result = generate_image_grid(
+                image_inputs=[ImageInput(name="wide.png", stream=_png_stream((20, 80, 160)))],
+                output_directory=directory,
+                options=GridOptions(
+                    individual_image_size=50,
+                    randomized_order=False,
+                    stretch_to_square=True,
+                ),
+            )
+
+            with Image.open(result.path) as generated:
+                self.assertEqual(generated.size, (50, 50))
+                self.assertEqual(generated.getpixel((0, 0)), (20, 80, 160))
+                self.assertEqual(generated.getpixel((49, 49)), (20, 80, 160))
+
     @unittest.skipUnless(HEIF_SUPPORT_ENABLED, "pillow-heif is not installed")
     def test_generate_image_grid_from_heic_without_modifying_source(self):
         with tempfile.TemporaryDirectory() as directory:

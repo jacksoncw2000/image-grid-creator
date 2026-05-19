@@ -52,6 +52,7 @@ class GridOptions:
     individual_image_size: int = 1000
     randomized_order: bool = True
     printer_paper_format: bool = False
+    stretch_to_square: bool = False
     background_color: Tuple[int, int, int] = DEFAULT_BACKGROUND_COLOR
     max_output_pixels: int = DEFAULT_MAX_OUTPUT_PIXELS
     random_seed: Optional[int] = None
@@ -147,7 +148,13 @@ def generate_image_grid(
     with Image.new("RGB", (layout.width, layout.height), options.background_color) as grid:
         for index, image_input in enumerate(inputs):
             with _open_existing_stream(image_input.stream) as stream:
-                tile = _make_tile(stream, image_input.name, layout.cell_size, options.background_color)
+                tile = _make_tile(
+                    stream,
+                    image_input.name,
+                    layout.cell_size,
+                    options.background_color,
+                    options.stretch_to_square,
+                )
 
             x = (index % layout.columns) * layout.cell_size
             y = (index // layout.columns) * layout.cell_size
@@ -187,7 +194,13 @@ def generate_image_grid_from_paths(
     with Image.new("RGB", (layout.width, layout.height), options.background_color) as grid:
         for index, path in enumerate(paths):
             with path.open("rb") as stream:
-                tile = _make_tile(stream, path.name, layout.cell_size, options.background_color)
+                tile = _make_tile(
+                    stream,
+                    path.name,
+                    layout.cell_size,
+                    options.background_color,
+                    options.stretch_to_square,
+                )
 
             x = (index % layout.columns) * layout.cell_size
             y = (index // layout.columns) * layout.cell_size
@@ -262,6 +275,7 @@ def _make_tile(
     filename: str,
     cell_size: int,
     background_color: Tuple[int, int, int],
+    stretch_to_square: bool,
 ) -> Image.Image:
     if _is_heif_filename(filename) and not HEIF_SUPPORT_ENABLED:
         raise InvalidImageFile(
@@ -273,7 +287,10 @@ def _make_tile(
         with Image.open(stream) as image:
             image = ImageOps.exif_transpose(image)
             image = _normalize_mode(image)
-            image.thumbnail((cell_size, cell_size), RESAMPLE_FILTER, reducing_gap=3.0)
+            if stretch_to_square:
+                image = image.resize((cell_size, cell_size), RESAMPLE_FILTER)
+            else:
+                image.thumbnail((cell_size, cell_size), RESAMPLE_FILTER, reducing_gap=3.0)
 
             tile = Image.new("RGB", (cell_size, cell_size), background_color)
             x = (cell_size - image.width) // 2

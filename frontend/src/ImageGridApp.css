@@ -57,12 +57,18 @@
   color: #607074;
 }
 
+.switch-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+}
+
 .switch-control {
   border: 1px solid #d8e0df;
   border-radius: 8px;
   margin: 0 !important;
   padding: 10px 14px;
-  flex: 1;
+  min-width: 0;
 }
 
 .hidden-file-input {

@@ -35,6 +35,7 @@ class AppTests(unittest.TestCase):
                 "individualImageSize": "50",
                 "randomizedOrder": "false",
                 "printerPaperFormat": "false",
+                "stretchToSquare": "true",
             },
             content_type="multipart/form-data",
         )

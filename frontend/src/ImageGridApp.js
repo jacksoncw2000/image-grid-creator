@@ -21,6 +21,7 @@ import {
   Download,
   FolderOpen,
   Image as ImageIcon,
+  Maximize2,
   Printer,
   RotateCcw,
   Shuffle,
@@ -41,6 +42,7 @@ const DEFAULT_SETTINGS = {
   individualImageSize: 1000,
   randomizedOrder: true,
   printerPaperFormat: false,
+  stretchToSquare: false,
 };
 
 const ImageGridApp = () => {
@@ -172,7 +174,7 @@ const ImageGridApp = () => {
               />
             </Box>
 
-            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+            <Box className="switch-grid">
               <FormControlLabel
                 className="switch-control"
                 control={
@@ -208,7 +210,25 @@ const ImageGridApp = () => {
                   </Stack>
                 }
               />
-            </Stack>
+
+              <FormControlLabel
+                className="switch-control"
+                control={
+                  <Switch
+                    checked={settings.stretchToSquare}
+                    onChange={(event) =>
+                      updateSetting('stretchToSquare', event.target.checked)
+                    }
+                  />
+                }
+                label={
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <Maximize2 size={19} />
+                    <span>Stretch squares</span>
+                  </Stack>
+                }
+              />
+            </Box>
 
             <Stack spacing={1.5}>
               <input

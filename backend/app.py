@@ -68,6 +68,7 @@ def create_app(config=None):
                 individual_image_size=_form_int("individualImageSize", 1000),
                 randomized_order=str_to_bool(request.form.get("randomizedOrder", "true")),
                 printer_paper_format=str_to_bool(request.form.get("printerPaperFormat", "false")),
+                stretch_to_square=str_to_bool(request.form.get("stretchToSquare", "false")),
                 max_output_pixels=app.config["MAX_OUTPUT_PIXELS"],
             )
 

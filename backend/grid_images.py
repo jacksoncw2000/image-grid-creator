@@ -10,6 +10,7 @@ def grid_images(
     individual_image_size=1000,
     randomized_order=True,
     printer_paper_format=False,
+    stretch_to_square=False,
 ):
     """Backward-compatible wrapper for older scripts that imported grid_images."""
     _ = base_directory_name
@@ -24,6 +25,7 @@ def grid_images(
         individual_image_size=individual_image_size,
         randomized_order=randomized_order,
         printer_paper_format=printer_paper_format,
+        stretch_to_square=stretch_to_square,
     )
     generated_grid = generate_image_grid_from_paths(
         image_paths=image_paths,

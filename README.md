@@ -16,6 +16,8 @@ for image processing and a React frontend for upload/settings/download.
   layouts, instead of relying on repeated square-root rounding.
 - Images are processed one at a time, EXIF orientation is handled with Pillow, and
   uploads are no longer copied into permanent batch folders.
+- A `Stretch squares` toggle can force every image to fill its square cell when
+  you prefer a tight grid with no padding between images.
 - HEIC/HEIF uploads are decoded in memory with `pillow-heif`; source files are
   only read, never modified.
 - The frontend now shows inline errors and separates upload progress from the
