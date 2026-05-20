@@ -23,6 +23,7 @@ import {
   Image as ImageIcon,
   Maximize2,
   Printer,
+  Puzzle,
   RotateCcw,
   Shuffle,
 } from 'lucide-react';
@@ -43,6 +44,7 @@ const DEFAULT_SETTINGS = {
   randomizedOrder: true,
   printerPaperFormat: false,
   stretchToSquare: false,
+  collageLayout: false,
 };
 
 const ImageGridApp = () => {
@@ -60,7 +62,26 @@ const ImageGridApp = () => {
     selectedStats.totalBytes > DEFAULT_BACKEND_UPLOAD_LIMIT_BYTES;
 
   const updateSetting = (key, value) => {
-    setSettings((current) => ({ ...current, [key]: value }));
+    setSettings((current) => {
+      if (key === 'collageLayout' && value) {
+        return {
+          ...current,
+          collageLayout: true,
+          printerPaperFormat: false,
+          stretchToSquare: false,
+        };
+      }
+
+      if ((key === 'printerPaperFormat' || key === 'stretchToSquare') && value) {
+        return {
+          ...current,
+          [key]: true,
+          collageLayout: false,
+        };
+      }
+
+      return { ...current, [key]: value };
+    });
   };
 
   const handleFileSelect = (event) => {
@@ -225,6 +246,24 @@ const ImageGridApp = () => {
                   <Stack direction="row" spacing={1} alignItems="center">
                     <Maximize2 size={19} />
                     <span>Stretch squares</span>
+                  </Stack>
+                }
+              />
+
+              <FormControlLabel
+                className="switch-control"
+                control={
+                  <Switch
+                    checked={settings.collageLayout}
+                    onChange={(event) =>
+                      updateSetting('collageLayout', event.target.checked)
+                    }
+                  />
+                }
+                label={
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <Puzzle size={19} />
+                    <span>Collage layout</span>
                   </Stack>
                 }
               />

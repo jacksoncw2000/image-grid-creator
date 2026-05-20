@@ -62,6 +62,27 @@ class AppTests(unittest.TestCase):
         self.assertEqual(response.mimetype, "image/png")
         response.close()
 
+    def test_create_grid_accepts_collage_layout(self):
+        response = self.client.post(
+            "/api/create-grid",
+            data={
+                "files[]": [(_png_stream((30, 90, 150)), "wide.png")],
+                "individualImageSize": "50",
+                "randomizedOrder": "false",
+                "collageLayout": "true",
+            },
+            content_type="multipart/form-data",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.mimetype, "image/png")
+
+        with Image.open(io.BytesIO(response.get_data())) as generated:
+            self.assertEqual(generated.mode, "RGBA")
+            self.assertEqual(generated.size, (50, 50))
+
+        response.close()
+
     def test_unsupported_file_type_returns_400(self):
         response = self.client.post(
             "/api/create-grid",

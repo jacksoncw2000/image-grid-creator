@@ -18,6 +18,9 @@ for image processing and a React frontend for upload/settings/download.
   uploads are no longer copied into permanent batch folders.
 - A `Stretch squares` toggle can force every image to fill its square cell when
   you prefer a tight grid with no padding between images.
+- A `Collage layout` toggle preserves aspect ratios and packs images into
+  balanced columns with no padding. Uneven outside edges are transparent in the
+  PNG instead of white.
 - HEIC/HEIF uploads are decoded in memory with `pillow-heif`; source files are
   only read, never modified.
 - The frontend now shows inline errors and separates upload progress from the

@@ -13,6 +13,7 @@ export const createImageGrid = ({ files, settings, onUploadProgress }) => {
   formData.append('randomizedOrder', settings.randomizedOrder);
   formData.append('printerPaperFormat', settings.printerPaperFormat);
   formData.append('stretchToSquare', settings.stretchToSquare);
+  formData.append('collageLayout', settings.collageLayout);
 
   return axios.post(`${API_BASE_URL}/api/create-grid`, formData, {
     responseType: 'blob',

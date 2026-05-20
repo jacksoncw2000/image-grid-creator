@@ -3,7 +3,8 @@
 React client for selecting images, configuring grid output, and downloading the
 generated PNG from the Flask backend. The file picker accepts common image
 formats, including HEIC/HEIF. Use `Stretch squares` when you want every image to
-fill its square cell instead of preserving aspect-ratio padding.
+fill its square cell, or `Collage layout` when you want aspect-ratio-preserving
+packing with transparent ragged edges instead of padding.
 
 ## Scripts
 

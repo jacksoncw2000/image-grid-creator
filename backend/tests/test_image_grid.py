@@ -80,6 +80,46 @@ class ImageGridTests(unittest.TestCase):
                 self.assertEqual(generated.getpixel((0, 0)), (20, 80, 160))
                 self.assertEqual(generated.getpixel((49, 49)), (20, 80, 160))
 
+    def test_collage_layout_preserves_aspect_ratio_without_padding(self):
+        with tempfile.TemporaryDirectory() as directory:
+            result = generate_image_grid(
+                image_inputs=[ImageInput(name="wide.png", stream=_png_stream((20, 80, 160)))],
+                output_directory=directory,
+                options=GridOptions(
+                    individual_image_size=50,
+                    randomized_order=False,
+                    collage_layout=True,
+                ),
+            )
+
+            with Image.open(result.path) as generated:
+                self.assertEqual(generated.mode, "RGBA")
+                self.assertEqual(generated.size, (50, 33))
+                self.assertEqual(generated.getpixel((0, 0)), (20, 80, 160, 255))
+                self.assertEqual(generated.getpixel((49, 32)), (20, 80, 160, 255))
+
+    def test_collage_layout_uses_transparency_for_ragged_edges(self):
+        inputs = [
+            ImageInput(name="wide.png", stream=_png_stream((20, 80, 160), size=(18, 12))),
+            ImageInput(name="tall.png", stream=_png_stream((180, 70, 30), size=(12, 24))),
+        ]
+
+        with tempfile.TemporaryDirectory() as directory:
+            result = generate_image_grid(
+                image_inputs=inputs,
+                output_directory=directory,
+                options=GridOptions(
+                    individual_image_size=50,
+                    randomized_order=False,
+                    collage_layout=True,
+                ),
+            )
+
+            with Image.open(result.path) as generated:
+                self.assertEqual(generated.size, (100, 100))
+                self.assertEqual(generated.getpixel((25, 50)), (0, 0, 0, 0))
+                self.assertEqual(generated.getpixel((75, 50)), (180, 70, 30, 255))
+
     @unittest.skipUnless(HEIF_SUPPORT_ENABLED, "pillow-heif is not installed")
     def test_generate_image_grid_from_heic_without_modifying_source(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -104,9 +144,9 @@ class ImageGridTests(unittest.TestCase):
                 self.assertEqual(generated.size, (50, 50))
 
 
-def _png_stream(color):
+def _png_stream(color, size=(18, 12)):
     stream = io.BytesIO()
-    Image.new("RGB", (18, 12), color).save(stream, format="PNG")
+    Image.new("RGB", size, color).save(stream, format="PNG")
     stream.seek(0)
     return stream
 

@@ -69,6 +69,7 @@ def create_app(config=None):
                 randomized_order=str_to_bool(request.form.get("randomizedOrder", "true")),
                 printer_paper_format=str_to_bool(request.form.get("printerPaperFormat", "false")),
                 stretch_to_square=str_to_bool(request.form.get("stretchToSquare", "false")),
+                collage_layout=str_to_bool(request.form.get("collageLayout", "false")),
                 max_output_pixels=app.config["MAX_OUTPUT_PIXELS"],
             )
 

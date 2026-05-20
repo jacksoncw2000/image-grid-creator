@@ -53,6 +53,7 @@ class GridOptions:
     randomized_order: bool = True
     printer_paper_format: bool = False
     stretch_to_square: bool = False
+    collage_layout: bool = False
     background_color: Tuple[int, int, int] = DEFAULT_BACKGROUND_COLOR
     max_output_pixels: int = DEFAULT_MAX_OUTPUT_PIXELS
     random_seed: Optional[int] = None
@@ -63,14 +64,16 @@ class GridLayout:
     columns: int
     rows: int
     cell_size: int
+    width_pixels: Optional[int] = None
+    height_pixels: Optional[int] = None
 
     @property
     def width(self) -> int:
-        return self.columns * self.cell_size
+        return self.width_pixels or self.columns * self.cell_size
 
     @property
     def height(self) -> int:
-        return self.rows * self.cell_size
+        return self.height_pixels or self.rows * self.cell_size
 
     @property
     def pixel_count(self) -> int:
@@ -89,6 +92,15 @@ class GeneratedGrid:
     download_name: str
     layout: GridLayout
     image_count: int
+
+
+@dataclass(frozen=True)
+class CollagePlacement:
+    index: int
+    x: int
+    y: int
+    width: int
+    height: int
 
 
 T = TypeVar("T")
@@ -139,6 +151,9 @@ def generate_image_grid(
     _validate_image_count(len(inputs))
     _order_items(inputs, options)
 
+    if options.collage_layout:
+        return _generate_collage_from_inputs(inputs, output_directory, options)
+
     layout = _layout_for_options(len(inputs), options)
     _validate_output_size(layout, options)
 
@@ -185,6 +200,9 @@ def generate_image_grid_from_paths(
     _validate_image_count(len(paths))
     _order_items(paths, options)
 
+    if options.collage_layout:
+        return _generate_collage_from_paths(paths, output_directory, options)
+
     layout = _layout_for_options(len(paths), options)
     _validate_output_size(layout, options)
 
@@ -220,6 +238,88 @@ def generate_image_grid_from_paths(
     )
 
 
+def _generate_collage_from_inputs(
+    inputs: Sequence[ImageInput],
+    output_directory: Union[Path, str],
+    options: GridOptions,
+) -> GeneratedGrid:
+    aspect_ratios = []
+    for image_input in inputs:
+        with _open_existing_stream(image_input.stream) as stream:
+            aspect_ratios.append(_image_aspect_ratio(stream, image_input.name))
+
+    layout, placements = _collage_layout(aspect_ratios, options)
+    _validate_output_size(layout, options)
+
+    output_directory = Path(output_directory)
+    output_directory.mkdir(parents=True, exist_ok=True)
+
+    with Image.new("RGBA", (layout.width, layout.height), (0, 0, 0, 0)) as canvas:
+        for placement in placements:
+            image_input = inputs[placement.index]
+            with _open_existing_stream(image_input.stream) as stream:
+                tile = _make_collage_tile(
+                    stream,
+                    image_input.name,
+                    placement.width,
+                    placement.height,
+                )
+
+            _paste_image(canvas, tile, (placement.x, placement.y))
+            tile.close()
+
+        output_path, download_name = _output_paths(output_directory)
+        canvas.save(output_path, format="PNG")
+
+    return GeneratedGrid(
+        path=output_path,
+        download_name=download_name,
+        layout=layout,
+        image_count=len(inputs),
+    )
+
+
+def _generate_collage_from_paths(
+    paths: Sequence[Path],
+    output_directory: Union[Path, str],
+    options: GridOptions,
+) -> GeneratedGrid:
+    aspect_ratios = []
+    for path in paths:
+        with path.open("rb") as stream:
+            aspect_ratios.append(_image_aspect_ratio(stream, path.name))
+
+    layout, placements = _collage_layout(aspect_ratios, options)
+    _validate_output_size(layout, options)
+
+    output_directory = Path(output_directory)
+    output_directory.mkdir(parents=True, exist_ok=True)
+
+    with Image.new("RGBA", (layout.width, layout.height), (0, 0, 0, 0)) as canvas:
+        for placement in placements:
+            path = paths[placement.index]
+            with path.open("rb") as stream:
+                tile = _make_collage_tile(
+                    stream,
+                    path.name,
+                    placement.width,
+                    placement.height,
+                )
+
+            _paste_image(canvas, tile, (placement.x, placement.y))
+            tile.close()
+
+        output_path, download_name = _output_paths(output_directory)
+        canvas.save(output_path, format="PNG")
+
+    return GeneratedGrid(
+        path=output_path,
+        download_name=download_name,
+        layout=layout,
+        image_count=len(paths),
+    )
+
+
 def _layout_for_options(image_count: int, options: GridOptions) -> GridLayout:
     target_aspect_ratio = PRINTER_PAPER_ASPECT_RATIO if options.printer_paper_format else 1.0
     base_layout = choose_layout(image_count, target_aspect_ratio)
@@ -228,6 +328,75 @@ def _layout_for_options(image_count: int, options: GridOptions) -> GridLayout:
         rows=base_layout.rows,
         cell_size=options.individual_image_size,
     )
+
+
+def _collage_layout(
+    aspect_ratios: Sequence[float],
+    options: GridOptions,
+) -> Tuple[GridLayout, List[CollagePlacement]]:
+    best_layout = None
+    best_placements = None
+    best_score = None
+
+    for columns in range(1, len(aspect_ratios) + 1):
+        layout, placements, column_heights = _place_collage_columns(
+            aspect_ratios,
+            columns,
+            options.individual_image_size,
+        )
+        aspect_ratio = layout.width / layout.height
+        aspect_penalty = abs(math.log(aspect_ratio))
+        ragged_edge = max(column_heights) - min(column_heights)
+        score = (
+            round(aspect_penalty, 12),
+            ragged_edge,
+            columns,
+        )
+
+        if best_score is None or score < best_score:
+            best_layout = layout
+            best_placements = placements
+            best_score = score
+
+    return best_layout, best_placements
+
+
+def _place_collage_columns(
+    aspect_ratios: Sequence[float],
+    columns: int,
+    column_width: int,
+) -> Tuple[GridLayout, List[CollagePlacement], List[int]]:
+    column_heights = [0 for _ in range(columns)]
+    placements = []
+
+    for index, aspect_ratio in enumerate(aspect_ratios):
+        column = min(range(columns), key=lambda current: column_heights[current])
+        height = max(1, round(column_width / aspect_ratio))
+        x = column * column_width
+        y = column_heights[column]
+
+        placements.append(
+            CollagePlacement(
+                index=index,
+                x=x,
+                y=y,
+                width=column_width,
+                height=height,
+            )
+        )
+        column_heights[column] += height
+
+    width = columns * column_width
+    height = max(column_heights)
+    layout = GridLayout(
+        columns=columns,
+        rows=0,
+        cell_size=column_width,
+        width_pixels=width,
+        height_pixels=height,
+    )
+
+    return layout, placements, column_heights
 
 
 def _validate_options(options: GridOptions) -> None:
@@ -304,6 +473,59 @@ def _make_tile(
             return tile
     except (OSError, UnidentifiedImageError, ValueError) as exc:
         raise InvalidImageFile(f"{filename} is not a readable image.") from exc
+
+
+def _make_collage_tile(
+    stream: BinaryIO,
+    filename: str,
+    width: int,
+    height: int,
+) -> Image.Image:
+    if _is_heif_filename(filename) and not HEIF_SUPPORT_ENABLED:
+        raise InvalidImageFile(
+            f"{filename} is a HEIC/HEIF image, but HEIC support is not installed. "
+            "Run pip install -r backend/requirements.txt and restart the backend."
+        )
+
+    try:
+        with Image.open(stream) as image:
+            image = ImageOps.exif_transpose(image)
+            image = _normalize_mode(image)
+            return image.resize((width, height), RESAMPLE_FILTER)
+    except (OSError, UnidentifiedImageError, ValueError) as exc:
+        raise InvalidImageFile(f"{filename} is not a readable image.") from exc
+
+
+def _image_aspect_ratio(stream: BinaryIO, filename: str) -> float:
+    if _is_heif_filename(filename) and not HEIF_SUPPORT_ENABLED:
+        raise InvalidImageFile(
+            f"{filename} is a HEIC/HEIF image, but HEIC support is not installed. "
+            "Run pip install -r backend/requirements.txt and restart the backend."
+        )
+
+    try:
+        with Image.open(stream) as image:
+            image = ImageOps.exif_transpose(image)
+            if image.height <= 0:
+                raise ValueError("Image height must be greater than zero.")
+
+            return image.width / image.height
+    except (OSError, UnidentifiedImageError, ValueError) as exc:
+        raise InvalidImageFile(f"{filename} is not a readable image.") from exc
+
+
+def _paste_image(canvas: Image.Image, image: Image.Image, xy: Tuple[int, int]) -> None:
+    if image.mode == "RGBA":
+        canvas.paste(image, xy, image.getchannel("A"))
+    else:
+        canvas.paste(image, xy)
+
+
+def _output_paths(output_directory: Path) -> Tuple[Path, str]:
+    timestamp = dt.datetime.now().strftime("%Y.%m.%d_%H.%M.%S")
+    download_name = f"{timestamp}_image_grid.png"
+    output_path = output_directory / f"{timestamp}_{uuid4().hex[:8]}_image_grid.png"
+    return output_path, download_name
 
 
 def _is_heif_filename(filename: str) -> bool:
